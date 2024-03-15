@@ -123,7 +123,8 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
 
     # TODO (Q1.3): Map pixels to points on the image plane at Z=1
     ndc_points = xy_grid.clone()
-
+    ndc_points = ndc_points.to(camera.device)
+    
     ndc_points = torch.cat(
         [
             ndc_points,
