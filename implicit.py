@@ -298,7 +298,54 @@ class NeuralRadianceField(torch.nn.Module):
         embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
         embedding_dim_dir = self.harmonic_embedding_dir.output_dim
 
-        pass
+        self.mlp = MLPWithInputSkips(
+            cfg.n_mlp_layers,
+            embedding_dim_xyz,
+            cfg.n_hidden_neurons_xyz,
+            embedding_dim_xyz,
+            cfg.n_hidden_neurons_xyz,
+            cfg.append_xyz
+        )
+        
+        self.layer_sigma = torch.nn.Sequential(
+                torch.nn.Linear(cfg.n_hidden_neurons_xyz, 1),
+                torch.nn.ReLU()
+            )
+        
+        self.layer_feature = torch.nn.Sequential(
+                torch.nn.Linear(cfg.n_hidden_neurons_xyz, cfg.n_hidden_neurons_xyz),
+                torch.nn.ReLU()
+            )
+        
+        self.layers_dir = torch.nn.Sequential(
+                torch.nn.Linear(embedding_dim_dir+cfg.n_hidden_neurons_xyz, cfg.n_hidden_neurons_dir),
+                torch.nn.ReLU(),
+                torch.nn.Linear(cfg.n_hidden_neurons_dir, 3),
+                torch.nn.Sigmoid()
+            )
+        
+    def forward(self, ray_bundle):
+        
+        sampled_points, sampled_dirs = ray_bundle.sample_points, ray_bundle.directions
+        sampled_points = self.harmonic_embedding_xyz(sampled_points)
+        out = self.mlp(sampled_points, sampled_points)
+        
+        # get sigma and rgb 
+        sigma = self.layer_sigma(out)
+        feature = self.layer_feature(out)
+        
+        
+        
+        sampled_dirs = self.harmonic_embedding_dir(sampled_dirs)
+        sampled_dirs = sampled_dirs.unsqueeze(1)
+        # sampled_dirs = sampled_dirs.repeat(1, sampled_points.shape[1], 1)
+        sampled_dirs = torch.tile(sampled_dirs, (1, sampled_points.shape[1], 1))
+        out = torch.cat((sampled_dirs, feature), dim=-1)
+        rgb = self.layers_dir(out)
+        return {
+            'density': sigma,
+            'feature': rgb
+        }
 
 
 class NeuralSurface(torch.nn.Module):
@@ -310,6 +357,28 @@ class NeuralSurface(torch.nn.Module):
         # TODO (Q6): Implement Neural Surface MLP to output per-point SDF
         # TODO (Q7): Implement Neural Surface MLP to output per-point color
 
+        self.harmonic_embedding_xyz = HarmonicEmbedding(3, cfg.n_harmonic_functions_xyz)
+        self.mlp = MLPWithInputSkips(
+            cfg.n_layers_distance,
+            self.harmonic_embedding_xyz.output_dim,
+            cfg.n_hidden_neurons_distance,
+            self.harmonic_embedding_xyz.output_dim,
+            cfg.n_hidden_neurons_distance,
+            cfg.append_distance
+        )
+        self.distance = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.Linear(cfg.n_hidden_neurons_distance, 1),
+        )
+
+        self.color = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.Linear(cfg.n_hidden_neurons_distance, cfg.n_hidden_neurons_color),
+            torch.nn.ReLU(),
+            torch.nn.Linear(cfg.n_hidden_neurons_color, 3),
+            torch.nn.Sigmoid()
+        )
+
     def get_distance(
         self,
         points
@@ -320,7 +389,11 @@ class NeuralSurface(torch.nn.Module):
             distance: N X 1 Tensor, where N is number of input points
         '''
         points = points.view(-1, 3)
-        pass
+        
+        out = self.harmonic_embedding_xyz(points)
+        out = self.mlp(out, out)
+        out = self.distance(out)
+        return out
     
     def get_color(
         self,
@@ -332,7 +405,11 @@ class NeuralSurface(torch.nn.Module):
             distance: N X 3 Tensor, where N is number of input points
         '''
         points = points.view(-1, 3)
-        pass
+        
+        out = self.harmonic_embedding_xyz(points)
+        out = self.mlp(out, out)
+        out = self.color(out)
+        return out
     
     def get_distance_color(
         self,
@@ -345,9 +422,14 @@ class NeuralSurface(torch.nn.Module):
         You may just implement this by independent calls to get_distance, get_color
             but, depending on your MLP implementation, it maybe more efficient to share some computation
         '''
-        
+        points = points.view(-1, 3)
+        out = self.harmonic_embedding_xyz(points)
+        out = self.mlp(out, out)
+        dist = self.distance(out)
+        rgb = self.color(out)
+        return dist, rgb
     def forward(self, points):
-        return self.get_distance(points)
+        return self.get_distance_color(points)
 
     def get_distance_and_gradient(
         self,
