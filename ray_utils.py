@@ -93,8 +93,13 @@ def get_pixels_from_image(image_size, camera):
     y = torch.linspace(0, H - 1, H)
 
     # TODO (Q1.3): Convert to the range [-1, 1] in both x and y
+<<<<<<< HEAD
     x = (x / (W - 1)) * 2 - 1
     y = (y / (H - 1)) * 2 - 1
+=======
+    x = (2 * x / (W - 1)) - 1
+    y = (2 * y / (H - 1)) - 1
+>>>>>>> 22029ad23cd9cd77ca466469891c03603689b667
 
     # Create grid of coordinates
     xy_grid = torch.stack(
@@ -110,7 +115,8 @@ def get_random_pixels_from_image(n_pixels, image_size, camera):
     xy_grid = get_pixels_from_image(image_size, camera)
     
     # TODO (Q2.1): Random subsampling of pixel coordinaters
-    pass
+    xy_grid_sub = xy_grid[torch.randperm(xy_grid.shape[0])]
+    xy_grid_sub = xy_grid_sub.to(camera.device)
 
     # Return
     return xy_grid_sub.reshape(-1, 2)[:n_pixels]
@@ -121,9 +127,15 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
     W, H = image_size[0], image_size[1]
 
     # TODO (Q1.3): Map pixels to points on the image plane at Z=1
+<<<<<<< HEAD
     ndc_points = xy_grid
     ndc_points = ndc_points.to(camera.device)
 
+=======
+    ndc_points = xy_grid.clone()
+    ndc_points = ndc_points.to(camera.device)
+    
+>>>>>>> 22029ad23cd9cd77ca466469891c03603689b667
     ndc_points = torch.cat(
         [
             ndc_points,
@@ -133,6 +145,7 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
     )
 
     # TODO (Q1.3): Use camera.unproject to get world space points from NDC space points
+<<<<<<< HEAD
     world_space_points = camera.unproject_points(ndc_points, world_points=True, from_ndc=True)
 
     # TODO (Q1.3): Get ray origins from camera center
@@ -141,6 +154,16 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
     # TODO (Q1.3): Get ray directions as image_plane_points - rays_o
     # pass
     rays_d = F.normalize(world_space_points-rays_o)
+=======
+    world_points = camera.unproject_points(ndc_points, world_points=True, from_ndc=True)
+
+    # TODO (Q1.3): Get ray origins from camera center
+    rays_o = torch.zeros_like(ndc_points[..., :-1]) + camera.get_camera_center()
+
+    # TODO (Q1.3): Get ray directions as image_plane_points - rays_o
+    rays_d = world_points - rays_o
+    rays_d = F.normalize(rays_d)
+>>>>>>> 22029ad23cd9cd77ca466469891c03603689b667
 
     # Create and return RayBundle
     return RayBundle(
