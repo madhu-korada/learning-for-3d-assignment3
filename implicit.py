@@ -299,7 +299,7 @@ class NeuralRadianceField(torch.nn.Module):
         embedding_dim_dir = self.harmonic_embedding_dir.output_dim
 
         self.mlp = MLPWithInputSkips(
-            cfg.n_mlp_layers,
+            cfg.n_layers_xyz,
             embedding_dim_xyz,
             cfg.n_hidden_neurons_xyz,
             embedding_dim_xyz,

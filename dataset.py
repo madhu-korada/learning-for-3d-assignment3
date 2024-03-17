@@ -121,6 +121,8 @@ def get_nerf_datasets(
     ]
 
     train_idx, val_idx, test_idx = train_data["split"]
+    # train_idx = list(range(20))
+    # val_idx, test_idx = train_data["split"][1], train_data["split"][2]
 
     train_dataset, val_dataset, test_dataset = [
         ListDataset(

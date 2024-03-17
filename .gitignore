@@ -1,2 +1,11 @@
 __pycache__/
 outputs/
+
+data/ 
+images/ 
+
+checkpoints
+points_checkpoint
+volsdf_checkpoint
+
+

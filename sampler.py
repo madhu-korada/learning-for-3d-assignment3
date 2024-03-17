@@ -56,7 +56,8 @@ class HierarchicalStratifiedSampler(torch.nn.Module):
     ):
         if not fine:
             # TODO (1.4): Compute z values for self.n_pts_per_ray points uniformly sampled between [near, far]
-            z_range = torch.arange(start=self.min_depth, end=self.max_depth, step=(self.max_depth-self.min_depth)/self.n_pts_per_ray).to(ray_bundle.directions.device)
+            # z_vals = torch.linspace(self.min_depth, self.max_depth, self.n_pts_per_ray)
+            z_vals = torch.arange(start=self.min_depth, end=self.max_depth, step=(self.max_depth-self.min_depth)/self.n_pts_per_ray).to(ray_bundle.directions.device)
 
         else:
             if weights is None:
@@ -65,15 +66,16 @@ class HierarchicalStratifiedSampler(torch.nn.Module):
             pdf = weights / weights.sum(1, keepdim=True)
             cdf = torch.cumsum(pdf, -1)
             u = torch.rand_like(cdf[..., :1])
-            z_range = torch.searchsorted(cdf, u, right=True).squeeze(-1).float()
-            z_range = z_range * (self.max_depth - self.min_depth) / self.n_pts_per_ray + self.min_depth
+            z_vals = torch.searchsorted(cdf, u, right=True).squeeze(-1).float()
+            z_vals = z_vals * (self.max_depth - self.min_depth) / self.n_pts_per_ray + self.min_depth
 
         return ray_bundle._replace(
-            sample_points=ray_bundle.origins.unsqueeze(1) + torch.einsum('mi,n->mni', ray_bundle.directions, z_range),
-            sample_lengths=torch.tile(z_range,(ray_bundle.directions.shape[0],1)).unsqueeze(2) ,
+            sample_points=ray_bundle.origins.unsqueeze(1) + torch.einsum('mi,n->mni', ray_bundle.directions, z_vals),
+            sample_lengths=torch.tile(z_vals,(ray_bundle.directions.shape[0],1)).unsqueeze(2) ,
         )
 
 
 sampler_dict = {
-    'stratified': StratifiedRaysampler
+    'stratified': StratifiedRaysampler,
+    'hierarchical': HierarchicalStratifiedSampler
 }
